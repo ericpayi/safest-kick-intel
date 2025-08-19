@@ -2,25 +2,26 @@ import { useState, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { FilterBar } from '@/components/FilterBar';
 import { MatchCard } from '@/components/MatchCard';
-import { mockMatches } from '@/data/mockMatches';
 import heroImage from '@/assets/hero-soccer.jpg';
+import { useTodayMatches } from '@/hooks/useTodayMatches';
 
 const Index = () => {
   const [selectedLeague, setSelectedLeague] = useState('all');
   const [selectedSafety, setSelectedSafety] = useState('all');
+  const { data: matches = [], isLoading, isError } = useTodayMatches();
 
   const filteredMatches = useMemo(() => {
-    return mockMatches.filter(match => {
+    return matches.filter(match => {
       const leagueMatch = selectedLeague === 'all' || match.league === selectedLeague;
       const safetyMatch = selectedSafety === 'all' || match.prediction.safetyRating === selectedSafety;
       return leagueMatch && safetyMatch;
     });
-  }, [selectedLeague, selectedSafety]);
+  }, [matches, selectedLeague, selectedSafety]);
 
-  const matchCounts = useMemo(() => {
+const matchCounts = useMemo(() => {
     const filtered = selectedLeague === 'all' 
-      ? mockMatches 
-      : mockMatches.filter(match => match.league === selectedLeague);
+      ? matches 
+      : matches.filter(match => match.league === selectedLeague);
     
     return {
       total: filtered.length,
@@ -28,7 +29,7 @@ const Index = () => {
       medium: filtered.filter(m => m.prediction.safetyRating === 'medium').length,
       risky: filtered.filter(m => m.prediction.safetyRating === 'risky').length,
     };
-  }, [selectedLeague]);
+  }, [matches, selectedLeague]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -51,7 +52,7 @@ const Index = () => {
               <span className="text-primary block">Predictions</span>
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              AI-powered analysis delivering the safest betting predictions with confidence scores and detailed insights.
+              Real-time fixtures powered by API-Football with AI-ready insights.
             </p>
           </div>
         </div>
@@ -67,20 +68,31 @@ const Index = () => {
           matchCounts={matchCounts}
         />
 
-        {/* Matches Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-          {filteredMatches.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
-        </div>
+{/* Matches Grid or Loading */}
+{isError && (
+  <div className="text-center py-12">
+    <p className="text-lg text-destructive">Failed to load matches. Please try again.</p>
+  </div>
+)}
+{isLoading ? (
+  <div className="text-center py-12">
+    <p className="text-muted-foreground text-lg">Loading today's fixtures...</p>
+  </div>
+) : (
+  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+    {filteredMatches.map((match) => (
+      <MatchCard key={match.id} match={match} />
+    ))}
+  </div>
+)}
 
-        {filteredMatches.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">
-              No matches found for the selected filters.
-            </p>
-          </div>
-        )}
+{!isLoading && filteredMatches.length === 0 && !isError && (
+  <div className="text-center py-12">
+    <p className="text-muted-foreground text-lg">
+      No matches found for the selected filters.
+    </p>
+  </div>
+)}
       </main>
     </div>
   );
