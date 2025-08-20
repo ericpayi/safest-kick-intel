@@ -17,18 +17,20 @@ export async function fetchTodayMatches(date?: string): Promise<Match[]> {
     });
 
     if (error) {
-      console.warn("Edge function error. Using mock matches.", error);
+      console.warn("[useTodayMatches] Edge function error. Using mock matches.", error);
       return mockMatches;
     }
 
+    console.log("[useTodayMatches] Edge function response:", data);
+
     if (!data || !("matches" in data) || !Array.isArray((data as any).matches)) {
-      console.warn("Edge function responded without matches. Using mock matches.", data);
+      console.warn("[useTodayMatches] Edge function responded without matches. Using mock matches.", data);
       return mockMatches;
     }
 
     return (data as any).matches as Match[];
   } catch (err) {
-    console.warn("Failed to invoke edge function. Using mock matches.", err);
+    console.warn("[useTodayMatches] Failed to invoke edge function. Using mock matches.", err);
     return mockMatches;
   }
 }
