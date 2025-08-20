@@ -8,7 +8,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
 serve(async (req: Request) => {
@@ -19,11 +19,23 @@ serve(async (req: Request) => {
 
   try {
     const url = new URL(req.url);
+    const method = req.method || "GET";
+
+    // Support both GET (querystring) and POST (JSON body) for date
     const dateParam = url.searchParams.get("date"); // YYYY-MM-DD
+    let bodyDate: string | null = null;
+    if (method === "POST") {
+      try {
+        const body = await req.json();
+        bodyDate = (body && typeof body.date === "string") ? body.date : null;
+      } catch (_) {
+        bodyDate = null;
+      }
+    }
 
     // Default to today's date in UTC if not provided
     const todayUtc = new Date().toISOString().slice(0, 10);
-    const date = dateParam || todayUtc;
+    const date = dateParam || bodyDate || todayUtc;
 
     const RAPIDAPI_KEY = Deno.env.get("RAPIDAPI_KEY");
     if (!RAPIDAPI_KEY) {

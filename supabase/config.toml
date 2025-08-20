@@ -1,1 +1,4 @@
 project_id = "rcagpifccqpzwceyztee"
+
+[functions.get-today-matches]
+verify_jwt = false

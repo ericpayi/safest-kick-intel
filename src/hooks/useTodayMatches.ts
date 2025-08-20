@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Match } from "@/types/match";
 import { mockMatches } from "@/data/mockMatches";
+import { supabase } from "@/integrations/supabase/client";
 
 function getToday(): string {
   const d = new Date();
@@ -11,23 +12,23 @@ function getToday(): string {
 export async function fetchTodayMatches(date?: string): Promise<Match[]> {
   const targetDate = date || getToday();
   try {
-    const res = await fetch(`/functions/v1/get-today-matches?date=${encodeURIComponent(targetDate)}`);
-    const contentType = res.headers.get("content-type") || "";
+    const { data, error } = await supabase.functions.invoke("get-today-matches", {
+      body: { date: targetDate },
+    });
 
-    if (!res.ok || !contentType.includes("application/json")) {
-      console.warn("Edge function not reachable or returned non-JSON. Using mock matches.", { status: res.status, contentType });
+    if (error) {
+      console.warn("Edge function error. Using mock matches.", error);
       return mockMatches;
     }
 
-    const data = await res.json();
-    if (!data?.matches) {
+    if (!data || !("matches" in data) || !Array.isArray((data as any).matches)) {
       console.warn("Edge function responded without matches. Using mock matches.", data);
       return mockMatches;
     }
 
-    return data.matches as Match[];
+    return (data as any).matches as Match[];
   } catch (err) {
-    console.warn("Failed to fetch matches. Using mock matches.", err);
+    console.warn("Failed to invoke edge function. Using mock matches.", err);
     return mockMatches;
   }
 }
