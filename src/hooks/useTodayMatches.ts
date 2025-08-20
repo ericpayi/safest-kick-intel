@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Match } from "@/types/match";
+import { mockMatches } from "@/data/mockMatches";
 
 function getToday(): string {
   const d = new Date();
@@ -9,13 +10,26 @@ function getToday(): string {
 
 export async function fetchTodayMatches(date?: string): Promise<Match[]> {
   const targetDate = date || getToday();
-  const res = await fetch(`/functions/v1/get-today-matches?date=${encodeURIComponent(targetDate)}`);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Failed to fetch matches");
+  try {
+    const res = await fetch(`/functions/v1/get-today-matches?date=${encodeURIComponent(targetDate)}`);
+    const contentType = res.headers.get("content-type") || "";
+
+    if (!res.ok || !contentType.includes("application/json")) {
+      console.warn("Edge function not reachable or returned non-JSON. Using mock matches.", { status: res.status, contentType });
+      return mockMatches;
+    }
+
+    const data = await res.json();
+    if (!data?.matches) {
+      console.warn("Edge function responded without matches. Using mock matches.", data);
+      return mockMatches;
+    }
+
+    return data.matches as Match[];
+  } catch (err) {
+    console.warn("Failed to fetch matches. Using mock matches.", err);
+    return mockMatches;
   }
-  const data = await res.json();
-  return data.matches as Match[];
 }
 
 export function useTodayMatches(date?: string) {
