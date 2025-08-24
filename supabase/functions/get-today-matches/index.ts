@@ -37,12 +37,21 @@ serve(async (req: Request) => {
     const todayUtc = new Date().toISOString().slice(0, 10);
     const date = dateParam || bodyDate || todayUtc;
 
-    const RAPIDAPI_KEY =
-      Deno.env.get("RAPIDAPI_KEY") ||
-      Deno.env.get("RAPID_API_KEY") ||
-      Deno.env.get("X_RAPIDAPI_KEY");
+    const envCandidates = ["RAPIDAPI_KEY", "RAPID_API_KEY", "X_RAPIDAPI_KEY"];
+    const RAPIDAPI_KEY = envCandidates
+      .map((k) => Deno.env.get(k))
+      .find((v) => !!v);
+
     if (!RAPIDAPI_KEY) {
-      console.error("[get-today-matches] Missing RapidAPI key. Checked RAPIDAPI_KEY, RAPID_API_KEY, X_RAPIDAPI_KEY");
+      try {
+        const present = envCandidates.filter((k) => !!Deno.env.get(k));
+        console.error(
+          "[get-today-matches] Missing RapidAPI key. Checked:", envCandidates,
+          "Present:", present
+        );
+      } catch (_) {
+        // ignore logging errors
+      }
       return new Response(JSON.stringify({ error: "Missing RAPIDAPI_KEY secret" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
