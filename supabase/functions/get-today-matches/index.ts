@@ -28,8 +28,13 @@ serve(async (req: Request) => {
       try {
         const body = await req.json();
         bodyDate = (body && typeof body.date === "string") ? body.date : null;
+        // Optional: allow a temporary override key in request body for debugging
+        // DO NOT use this in production clients; prefer Supabase Secrets
+        // Example body: { date: "YYYY-MM-DD", rapidapiKey: "..." }
+        (req as any)._bodyRapidKey = (body && typeof body.rapidapiKey === "string") ? body.rapidapiKey : null;
       } catch (_) {
         bodyDate = null;
+        (req as any)._bodyRapidKey = null;
       }
     }
 
@@ -38,24 +43,30 @@ serve(async (req: Request) => {
     const date = dateParam || bodyDate || todayUtc;
 
     const envCandidates = ["RAPIDAPI_KEY", "RAPID_API_KEY", "X_RAPIDAPI_KEY"];
-    const RAPIDAPI_KEY = envCandidates
+    const envKey = envCandidates
       .map((k) => Deno.env.get(k))
-      .find((v) => !!v);
+      .find((v) => !!v) || null;
+
+    const bodyRapidKey = (req as any)._bodyRapidKey as string | null;
+    const RAPIDAPI_KEY = envKey || bodyRapidKey;
 
     if (!RAPIDAPI_KEY) {
       try {
         const present = envCandidates.filter((k) => !!Deno.env.get(k));
         console.error(
-          "[get-today-matches] Missing RapidAPI key. Checked:", envCandidates,
-          "Present:", present
+          "[get-today-matches] Missing RapidAPI key.",
+          { checked: envCandidates, present, hasBodyOverride: !!bodyRapidKey }
         );
       } catch (_) {
         // ignore logging errors
       }
-      return new Response(JSON.stringify({ error: "Missing RAPIDAPI_KEY secret" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Missing RAPIDAPI_KEY secret", checked: envCandidates }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Fetch today's fixtures
