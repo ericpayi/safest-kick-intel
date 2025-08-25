@@ -1,5 +1,4 @@
-// Supabase Edge Function: get-today-matches
-// Uses RAPIDAPI_KEY (stored in Supabase secrets) to fetch today's fixtures
+// Uses APISPORTS_KEY (stored in Supabase secrets) to fetch today's fixtures from api-sports.io
 // and maps them to the app's Match type shape (with minimal placeholder prediction fields for now)
 
 // deno-lint-ignore-file no-explicit-any
@@ -30,11 +29,11 @@ serve(async (req: Request) => {
         bodyDate = (body && typeof body.date === "string") ? body.date : null;
         // Optional: allow a temporary override key in request body for debugging
         // DO NOT use this in production clients; prefer Supabase Secrets
-        // Example body: { date: "YYYY-MM-DD", rapidapiKey: "..." }
-        (req as any)._bodyRapidKey = (body && typeof body.rapidapiKey === "string") ? body.rapidapiKey : null;
+        // Example body: { date: "YYYY-MM-DD", apisportsKey: "..." }
+        (req as any)._bodyApiKey = (body && typeof body.apisportsKey === "string") ? body.apisportsKey : null;
       } catch (_) {
         bodyDate = null;
-        (req as any)._bodyRapidKey = null;
+        (req as any)._bodyApiKey = null;
       }
     }
 
@@ -42,26 +41,26 @@ serve(async (req: Request) => {
     const todayUtc = new Date().toISOString().slice(0, 10);
     const date = dateParam || bodyDate || todayUtc;
 
-    const envCandidates = ["RAPIDAPI_KEY", "RAPID_API_KEY", "X_RAPIDAPI_KEY"];
+    const envCandidates = ["APISPORTS_KEY"];
     const envKey = envCandidates
       .map((k) => Deno.env.get(k))
       .find((v) => !!v) || null;
 
-    const bodyRapidKey = (req as any)._bodyRapidKey as string | null;
-    const RAPIDAPI_KEY = envKey || bodyRapidKey;
+    const bodyApiKey = (req as any)._bodyApiKey as string | null;
+    const APISPORTS_KEY = envKey || bodyApiKey || "ae601aab18443b82b03dc35c6e7645fe";
 
-    if (!RAPIDAPI_KEY) {
+    if (!APISPORTS_KEY) {
       try {
         const present = envCandidates.filter((k) => !!Deno.env.get(k));
         console.error(
-          "[get-today-matches] Missing RapidAPI key.",
-          { checked: envCandidates, present, hasBodyOverride: !!bodyRapidKey }
+          "[get-today-matches] Missing API Sports key.",
+          { checked: envCandidates, present, hasBodyOverride: !!bodyApiKey }
         );
       } catch (_) {
         // ignore logging errors
       }
       return new Response(
-        JSON.stringify({ error: "Missing RAPIDAPI_KEY secret", checked: envCandidates }),
+        JSON.stringify({ error: "Missing APISPORTS_KEY secret", checked: envCandidates }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -70,11 +69,10 @@ serve(async (req: Request) => {
     }
 
     // Fetch today's fixtures
-    const apiUrl = `https://api-football-v1.p.rapidapi.com/v3/fixtures?date=${date}`;
+    const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${date}`;
     const apiRes = await fetch(apiUrl, {
       headers: {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "api-football-v1.p.rapidapi.com",
+        "x-apisports-key": APISPORTS_KEY,
       },
     });
 
