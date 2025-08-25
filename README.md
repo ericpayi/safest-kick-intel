@@ -1,3 +1,5 @@
+# Eric Payi
+
 # Welcome to your Lovable project
 
 ## Project info
