@@ -42,12 +42,10 @@ serve(async (req: Request) => {
     const date = dateParam || bodyDate || todayUtc;
 
     const envCandidates = ["APISPORTS_KEY"];
-    const envKey = envCandidates
-      .map((k) => Deno.env.get(k))
-      .find((v) => !!v) || null;
+    const envKey = envCandidates.map((k) => Deno.env.get(k)).find((v) => !!v) || null;
 
     const bodyApiKey = (req as any)._bodyApiKey as string | null;
-    const APISPORTS_KEY = envKey || bodyApiKey || "ae601aab18443b82b03dc35c6e7645fe";
+    const APISPORTS_KEY = envKey || bodyApiKey;
 
     if (!APISPORTS_KEY) {
       try {
@@ -69,7 +67,7 @@ serve(async (req: Request) => {
     }
 
     // Fetch today's fixtures
-    const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${date}`;
+    const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${date}&timezone=UTC`;
     const apiRes = await fetch(apiUrl, {
       headers: {
         "x-apisports-key": APISPORTS_KEY,
