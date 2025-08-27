@@ -23,6 +23,10 @@ export const mockMatches: Match[] = [
       outcome: 'home',
       confidence: 78,
       safetyRating: 'medium',
+      scorePrediction: {
+        homeScore: 2,
+        awayScore: 1
+      },
       odds: {
         home: 2.10,
         draw: 3.40,
@@ -69,6 +73,10 @@ export const mockMatches: Match[] = [
       outcome: 'home',
       confidence: 85,
       safetyRating: 'safe',
+      scorePrediction: {
+        homeScore: 2,
+        awayScore: 0
+      },
       odds: {
         home: 1.80,
         draw: 3.60,
@@ -115,6 +123,10 @@ export const mockMatches: Match[] = [
       outcome: 'draw',
       confidence: 62,
       safetyRating: 'risky',
+      scorePrediction: {
+        homeScore: 1,
+        awayScore: 1
+      },
       odds: {
         home: 2.80,
         draw: 3.20,
@@ -161,6 +173,10 @@ export const mockMatches: Match[] = [
       outcome: 'home',
       confidence: 92,
       safetyRating: 'safe',
+      scorePrediction: {
+        homeScore: 3,
+        awayScore: 1
+      },
       odds: {
         home: 1.65,
         draw: 3.80,
@@ -207,6 +223,10 @@ export const mockMatches: Match[] = [
       outcome: 'away',
       confidence: 71,
       safetyRating: 'medium',
+      scorePrediction: {
+        homeScore: 0,
+        awayScore: 1
+      },
       odds: {
         home: 3.10,
         draw: 3.20,

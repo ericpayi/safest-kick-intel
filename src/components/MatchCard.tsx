@@ -69,8 +69,13 @@ export const MatchCard = ({ match }: MatchCardProps) => {
             </div>
           </div>
           
-          <div className="text-center">
-            <p className="text-2xl font-bold text-muted-foreground">VS</p>
+          <div className="text-center space-y-1">
+            <div className="bg-primary/10 rounded-lg p-3">
+              <div className="text-3xl font-bold text-primary">
+                {prediction.scorePrediction.homeScore} - {prediction.scorePrediction.awayScore}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Predicted Score</p>
+            </div>
           </div>
           
           <div className="text-center space-y-2">

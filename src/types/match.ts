@@ -17,6 +17,10 @@ export interface Match {
     outcome: 'home' | 'away' | 'draw';
     confidence: number; // 0-100
     safetyRating: 'safe' | 'medium' | 'risky';
+    scorePrediction: {
+      homeScore: number;
+      awayScore: number;
+    };
     odds: {
       home: number;
       draw: number;

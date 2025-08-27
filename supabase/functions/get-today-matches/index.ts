@@ -162,6 +162,21 @@ serve(async (req: Request) => {
           safetyRating = 'risky';
         }
 
+        // Generate score prediction based on outcome
+        let homeScore: number, awayScore: number;
+        if (outcome === 'home') {
+          homeScore = Math.floor(1 + (r2 * 3)); // 1-3 goals
+          awayScore = Math.floor(r3 * 2); // 0-1 goals
+        } else if (outcome === 'away') {
+          homeScore = Math.floor(r2 * 2); // 0-1 goals
+          awayScore = Math.floor(1 + (r3 * 3)); // 1-3 goals
+        } else {
+          // Draw
+          const scoreOptions = [[0,0], [1,1], [2,2], [1,1], [1,1]]; // Favor 1-1 draws
+          const idx = Math.floor(r2 * scoreOptions.length);
+          [homeScore, awayScore] = scoreOptions[idx];
+        }
+
         // Generate tips based on outcome and data
         const tips = [];
         if (outcome === 'draw') {
@@ -180,6 +195,10 @@ serve(async (req: Request) => {
           outcome,
           confidence,
           safetyRating,
+          scorePrediction: {
+            homeScore,
+            awayScore
+          },
           odds,
           tips
         };
