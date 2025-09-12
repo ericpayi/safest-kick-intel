@@ -41,24 +41,24 @@ serve(async (req: Request) => {
     const todayUtc = new Date().toISOString().slice(0, 10);
     const date = dateParam || bodyDate || todayUtc;
 
-    const envCandidates = ["APISPORTS_KEY"];
+    const envCandidates = ["FOOTBALL_DATA_API_KEY"];
     const envKey = envCandidates.map((k) => Deno.env.get(k)).find((v) => !!v) || null;
 
     const bodyApiKey = (req as any)._bodyApiKey as string | null;
-    const APISPORTS_KEY = envKey || bodyApiKey;
+    const FOOTBALL_DATA_API_KEY = envKey || bodyApiKey;
 
-    if (!APISPORTS_KEY) {
+    if (!FOOTBALL_DATA_API_KEY) {
       try {
         const present = envCandidates.filter((k) => !!Deno.env.get(k));
         console.error(
-          "[get-today-matches] Missing API Sports key.",
+          "[get-today-matches] Missing Football Data API key.",
           { checked: envCandidates, present, hasBodyOverride: !!bodyApiKey }
         );
       } catch (_) {
         // ignore logging errors
       }
       return new Response(
-        JSON.stringify({ error: "Missing APISPORTS_KEY secret", checked: envCandidates }),
+        JSON.stringify({ error: "Missing FOOTBALL_DATA_API_KEY secret", checked: envCandidates }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,23 +66,23 @@ serve(async (req: Request) => {
       );
     }
 
-    // Major league IDs for API-Football
-    const targetLeagues = [
-      39,   // Premier League (England)
-      140,  // La Liga (Spain) 
-      78,   // Bundesliga (Germany)
-      135,  // Serie A (Italy)
-      61,   // Ligue 1 (France)
-      88,   // Eredivisie (Netherlands)
-      94,   // Primeira Liga (Portugal)
-      72,   // Championship (England)
-      71,   // Brasileiro Série A (Brazil)
-      2,    // UEFA Champions League
-      1,    // FIFA World Cup
-      4,    // European Championship
+    // Major league codes for Football-data API
+    const targetCompetitions = [
+      "PL",   // Premier League (England)
+      "PD",   // Primera Division (Spain/La Liga) 
+      "BL1",  // Bundesliga (Germany)
+      "SA",   // Serie A (Italy)
+      "FL1",  // Ligue 1 (France)
+      "DED",  // Eredivisie (Netherlands)
+      "PPL",  // Primeira Liga (Portugal)
+      "ELC",  // Championship (England)
+      "BSA",  // Campeonato Brasileiro Série A (Brazil)
+      "CL",   // UEFA Champions League
+      "WC",   // FIFA World Cup
+      "EC",   // European Championship
     ];
 
-    // Try to fetch fixtures for multiple leagues over the next 7 days
+    // Try to fetch fixtures for multiple competitions over the next 7 days
     let fixtures: any[] = [];
     let actualDate = date;
     
@@ -94,56 +94,58 @@ serve(async (req: Request) => {
       datesToTry.push(checkDate.toISOString().slice(0, 10));
     }
 
-    console.log(`[get-today-matches] Searching for fixtures in major leagues over ${datesToTry.length} days...`);
+    console.log(`[get-today-matches] Searching for fixtures in major competitions over ${datesToTry.length} days...`);
 
-    // Try each league and date combination until we find matches
-    for (const leagueId of targetLeagues) {
+    // Try each competition and date combination until we find matches
+    for (const competitionCode of targetCompetitions) {
       if (fixtures.length > 0) break; // Stop if we found matches
       
       for (const tryDate of datesToTry) {
-        const apiUrl = `https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${tryDate}&timezone=UTC`;
-        console.log(`[get-today-matches] Trying league ${leagueId} for date: ${tryDate}`);
+        // Football-data API uses different endpoint structure
+        const apiUrl = `https://api.football-data.org/v4/competitions/${competitionCode}/matches?dateFrom=${tryDate}&dateTo=${tryDate}`;
+        console.log(`[get-today-matches] Trying competition ${competitionCode} for date: ${tryDate}`);
         
         try {
           const apiRes = await fetch(apiUrl, {
             headers: {
-              "x-apisports-key": APISPORTS_KEY,
+              "X-Auth-Token": FOOTBALL_DATA_API_KEY,
             },
           });
 
           if (!apiRes.ok) {
-            console.log(`[get-today-matches] API error for league ${leagueId}, date ${tryDate}:`, await apiRes.text());
+            console.log(`[get-today-matches] API error for competition ${competitionCode}, date ${tryDate}:`, await apiRes.text());
             continue;
           }
 
           const data = await apiRes.json();
-          const dateFixtures = data?.response || [];
+          const dateFixtures = data?.matches || [];
           
           if (dateFixtures && dateFixtures.length > 0) {
             fixtures = dateFixtures;
             actualDate = tryDate;
-            console.log(`[get-today-matches] Found ${fixtures.length} fixtures for league ${leagueId} on date ${tryDate}`);
+            console.log(`[get-today-matches] Found ${fixtures.length} fixtures for competition ${competitionCode} on date ${tryDate}`);
             break;
           }
         } catch (error) {
-          console.log(`[get-today-matches] Error fetching league ${leagueId}, date ${tryDate}:`, error);
+          console.log(`[get-today-matches] Error fetching competition ${competitionCode}, date ${tryDate}:`, error);
           continue;
         }
       }
     }
 
-    // If still no fixtures found, try a broader search without league filter for the next few days
+    // If still no fixtures found, try a broader search across all competitions for the next few days
     if (!fixtures || fixtures.length === 0) {
-      console.log(`[get-today-matches] No fixtures found in major leagues. Trying broader search...`);
+      console.log(`[get-today-matches] No fixtures found in major competitions. Trying broader search...`);
       
       for (const tryDate of datesToTry.slice(0, 3)) { // Only try next 3 days for broader search
-        const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${tryDate}&timezone=UTC`;
+        // Use matches endpoint for all competitions
+        const apiUrl = `https://api.football-data.org/v4/matches?dateFrom=${tryDate}&dateTo=${tryDate}`;
         console.log(`[get-today-matches] Broad search for date: ${tryDate}`);
         
         try {
           const apiRes = await fetch(apiUrl, {
             headers: {
-              "x-apisports-key": APISPORTS_KEY,
+              "X-Auth-Token": FOOTBALL_DATA_API_KEY,
             },
           });
 
@@ -153,15 +155,15 @@ serve(async (req: Request) => {
           }
 
           const data = await apiRes.json();
-          const dateFixtures = data?.response || [];
+          const dateFixtures = data?.matches || [];
           
           if (dateFixtures && dateFixtures.length > 0) {
-            // Filter to only include matches from major leagues if possible
-            const majorLeagueFixtures = dateFixtures.filter((fixture: any) => 
-              targetLeagues.includes(fixture.league?.id)
+            // Filter to only include matches from major competitions if possible
+            const majorCompetitionFixtures = dateFixtures.filter((fixture: any) => 
+              targetCompetitions.includes(fixture.competition?.code)
             );
             
-            fixtures = majorLeagueFixtures.length > 0 ? majorLeagueFixtures : dateFixtures.slice(0, 20); // Limit to 20 if no major leagues
+            fixtures = majorCompetitionFixtures.length > 0 ? majorCompetitionFixtures : dateFixtures.slice(0, 20); // Limit to 20 if no major competitions
             actualDate = tryDate;
             console.log(`[get-today-matches] Found ${fixtures.length} fixtures in broad search for date ${tryDate}`);
             break;
@@ -243,11 +245,11 @@ serve(async (req: Request) => {
 
     // Map to our app's Match shape with varied predictions
     const matches = fixtures.map((f: any) => {
-      const id = String(f.fixture?.id ?? crypto.randomUUID());
-      const home = f.teams?.home;
-      const away = f.teams?.away;
-      const league = f.league?.name ?? "Unknown League";
-      const dateIso = f.fixture?.date ?? new Date().toISOString();
+      const id = String(f.id ?? crypto.randomUUID());
+      const home = f.homeTeam;
+      const away = f.awayTeam;
+      const league = f.competition?.name ?? "Unknown League";
+      const dateIso = f.utcDate ?? new Date().toISOString();
 
       const short = (name: string | undefined) =>
         (name || "").split(" ")
