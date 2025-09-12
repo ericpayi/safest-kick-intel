@@ -66,51 +66,116 @@ serve(async (req: Request) => {
       );
     }
 
-    // Try to fetch fixtures for today first, then try nearby dates if none found
+    // Major league IDs for API-Football
+    const targetLeagues = [
+      39,   // Premier League (England)
+      140,  // La Liga (Spain) 
+      78,   // Bundesliga (Germany)
+      135,  // Serie A (Italy)
+      61,   // Ligue 1 (France)
+      88,   // Eredivisie (Netherlands)
+      94,   // Primeira Liga (Portugal)
+      72,   // Championship (England)
+      71,   // Brasileiro Série A (Brazil)
+      2,    // UEFA Champions League
+      1,    // FIFA World Cup
+      4,    // European Championship
+    ];
+
+    // Try to fetch fixtures for multiple leagues over the next 7 days
     let fixtures: any[] = [];
     let actualDate = date;
     
-    // Try current date and up to 3 days forward/backward to find matches
-    const datesToTry = [date];
-    for (let i = 1; i <= 3; i++) {
-      const futureDate = new Date(date);
-      futureDate.setDate(futureDate.getDate() + i);
-      const pastDate = new Date(date);
-      pastDate.setDate(pastDate.getDate() - i);
-      
-      datesToTry.push(futureDate.toISOString().slice(0, 10));
-      datesToTry.push(pastDate.toISOString().slice(0, 10));
+    // Generate dates for the next 7 days starting from today
+    const datesToTry = [];
+    for (let i = 0; i < 7; i++) {
+      const checkDate = new Date(date);
+      checkDate.setDate(checkDate.getDate() + i);
+      datesToTry.push(checkDate.toISOString().slice(0, 10));
     }
 
-    for (const tryDate of datesToTry) {
-      const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${tryDate}&timezone=UTC`;
-      console.log(`[get-today-matches] Trying to fetch fixtures for date: ${tryDate}`);
-      
-      const apiRes = await fetch(apiUrl, {
-        headers: {
-          "x-apisports-key": APISPORTS_KEY,
-        },
-      });
+    console.log(`[get-today-matches] Searching for fixtures in major leagues over ${datesToTry.length} days...`);
 
-      if (!apiRes.ok) {
-        console.log(`[get-today-matches] API error for date ${tryDate}:`, await apiRes.text());
-        continue;
+    // Try each league and date combination until we find matches
+    for (const leagueId of targetLeagues) {
+      if (fixtures.length > 0) break; // Stop if we found matches
+      
+      for (const tryDate of datesToTry) {
+        const apiUrl = `https://v3.football.api-sports.io/fixtures?league=${leagueId}&date=${tryDate}&timezone=UTC`;
+        console.log(`[get-today-matches] Trying league ${leagueId} for date: ${tryDate}`);
+        
+        try {
+          const apiRes = await fetch(apiUrl, {
+            headers: {
+              "x-apisports-key": APISPORTS_KEY,
+            },
+          });
+
+          if (!apiRes.ok) {
+            console.log(`[get-today-matches] API error for league ${leagueId}, date ${tryDate}:`, await apiRes.text());
+            continue;
+          }
+
+          const data = await apiRes.json();
+          const dateFixtures = data?.response || [];
+          
+          if (dateFixtures && dateFixtures.length > 0) {
+            fixtures = dateFixtures;
+            actualDate = tryDate;
+            console.log(`[get-today-matches] Found ${fixtures.length} fixtures for league ${leagueId} on date ${tryDate}`);
+            break;
+          }
+        } catch (error) {
+          console.log(`[get-today-matches] Error fetching league ${leagueId}, date ${tryDate}:`, error);
+          continue;
+        }
       }
+    }
 
-      const data = await apiRes.json();
-      const dateFixtures = data?.response || [];
+    // If still no fixtures found, try a broader search without league filter for the next few days
+    if (!fixtures || fixtures.length === 0) {
+      console.log(`[get-today-matches] No fixtures found in major leagues. Trying broader search...`);
       
-      if (dateFixtures && dateFixtures.length > 0) {
-        fixtures = dateFixtures;
-        actualDate = tryDate;
-        console.log(`[get-today-matches] Found ${fixtures.length} fixtures for date ${tryDate}`);
-        break;
+      for (const tryDate of datesToTry.slice(0, 3)) { // Only try next 3 days for broader search
+        const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${tryDate}&timezone=UTC`;
+        console.log(`[get-today-matches] Broad search for date: ${tryDate}`);
+        
+        try {
+          const apiRes = await fetch(apiUrl, {
+            headers: {
+              "x-apisports-key": APISPORTS_KEY,
+            },
+          });
+
+          if (!apiRes.ok) {
+            console.log(`[get-today-matches] API error in broad search for date ${tryDate}:`, await apiRes.text());
+            continue;
+          }
+
+          const data = await apiRes.json();
+          const dateFixtures = data?.response || [];
+          
+          if (dateFixtures && dateFixtures.length > 0) {
+            // Filter to only include matches from major leagues if possible
+            const majorLeagueFixtures = dateFixtures.filter((fixture: any) => 
+              targetLeagues.includes(fixture.league?.id)
+            );
+            
+            fixtures = majorLeagueFixtures.length > 0 ? majorLeagueFixtures : dateFixtures.slice(0, 20); // Limit to 20 if no major leagues
+            actualDate = tryDate;
+            console.log(`[get-today-matches] Found ${fixtures.length} fixtures in broad search for date ${tryDate}`);
+            break;
+          }
+        } catch (error) {
+          console.log(`[get-today-matches] Error in broad search for date ${tryDate}:`, error);
+          continue;
+        }
       }
     }
 
     // If still no fixtures found, log and return mock matches for demo purposes
     if (!fixtures || fixtures.length === 0) {
-      console.log(`[get-today-matches] No fixtures found for any nearby dates. Using mock matches for demo.`);
+      console.log(`[get-today-matches] No fixtures found for any leagues or dates. Using mock matches for demo.`);
       
       // Return mock matches with the requested date
       const mockMatches = [
