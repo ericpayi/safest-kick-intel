@@ -66,28 +66,51 @@ serve(async (req: Request) => {
       );
     }
 
-    // Fetch today's fixtures
-    const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${date}&timezone=UTC`;
-    const apiRes = await fetch(apiUrl, {
-      headers: {
-        "x-apisports-key": APISPORTS_KEY,
-      },
-    });
-
-    if (!apiRes.ok) {
-      const text = await apiRes.text();
-      return new Response(JSON.stringify({ error: "API error", details: text }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Try to fetch fixtures for today first, then try nearby dates if none found
+    let fixtures: any[] = [];
+    let actualDate = date;
+    
+    // Try current date and up to 3 days forward/backward to find matches
+    const datesToTry = [date];
+    for (let i = 1; i <= 3; i++) {
+      const futureDate = new Date(date);
+      futureDate.setDate(futureDate.getDate() + i);
+      const pastDate = new Date(date);
+      pastDate.setDate(pastDate.getDate() - i);
+      
+      datesToTry.push(futureDate.toISOString().slice(0, 10));
+      datesToTry.push(pastDate.toISOString().slice(0, 10));
     }
 
-    const data = await apiRes.json();
-    const fixtures: any[] = data?.response || [];
+    for (const tryDate of datesToTry) {
+      const apiUrl = `https://v3.football.api-sports.io/fixtures?date=${tryDate}&timezone=UTC`;
+      console.log(`[get-today-matches] Trying to fetch fixtures for date: ${tryDate}`);
+      
+      const apiRes = await fetch(apiUrl, {
+        headers: {
+          "x-apisports-key": APISPORTS_KEY,
+        },
+      });
 
-    // If no fixtures found, log and return mock matches for demo purposes
+      if (!apiRes.ok) {
+        console.log(`[get-today-matches] API error for date ${tryDate}:`, await apiRes.text());
+        continue;
+      }
+
+      const data = await apiRes.json();
+      const dateFixtures = data?.response || [];
+      
+      if (dateFixtures && dateFixtures.length > 0) {
+        fixtures = dateFixtures;
+        actualDate = tryDate;
+        console.log(`[get-today-matches] Found ${fixtures.length} fixtures for date ${tryDate}`);
+        break;
+      }
+    }
+
+    // If still no fixtures found, log and return mock matches for demo purposes
     if (!fixtures || fixtures.length === 0) {
-      console.log(`[get-today-matches] No fixtures found for date ${date}. Using mock matches for demo.`);
+      console.log(`[get-today-matches] No fixtures found for any nearby dates. Using mock matches for demo.`);
       
       // Return mock matches with the requested date
       const mockMatches = [
@@ -147,7 +170,7 @@ serve(async (req: Request) => {
         }
       ];
       
-      return new Response(JSON.stringify({ date, count: mockMatches.length, matches: mockMatches }), {
+      return new Response(JSON.stringify({ date: actualDate, count: mockMatches.length, matches: mockMatches }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -292,7 +315,7 @@ serve(async (req: Request) => {
       };
     });
 
-    return new Response(JSON.stringify({ date, count: matches.length, matches }), {
+    return new Response(JSON.stringify({ date: actualDate, count: matches.length, matches }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
